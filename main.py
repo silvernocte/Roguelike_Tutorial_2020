@@ -1,7 +1,9 @@
 import tcod
 
-from actions import Action, ActionType
-from input_handlers import handle_keys
+from engine import Engine
+from entity import Entity
+from game_map import GameMap
+from input_handlers import EventHandler
 
 
 def main():
@@ -9,53 +11,41 @@ def main():
     screen_width = 80
     screen_height = 50
 
-    # set player initial position
-    player_x = int(screen_width / 2)
-    player_y = int(screen_height / 2)
+    map_width = 80
+    map_height = 45
 
     # set tcod to use the font image included in the project
-    tcod.console_set_custom_font("arial10x10.png", tcod.FONT_TYPE_GREYSCALE | tcod.FONT_LAYOUT_TCOD)
+    tileset = tcod.tileset.load_tilesheet(
+        "dejavu10x10_gs_tc.png", 32, 8, tcod.tileset.CHARMAP_TCOD
+        )
+
+    event_handler = EventHandler()
+
+    # place entites, including player
+    player = Entity(int(screen_width / 2), int(screen_height / 2), "@", (255, 255, 255))
+    npc = Entity(int(screen_width / 2 - 5), int(screen_height / 2 - 2), "?", (255, 255, 0))
+    entities = {npc, player}
+
+    game_map = GameMap(map_width, map_height)
+
+    engine = Engine(entities=entities, event_handler=event_handler, game_map=game_map, player=player)
 
     # set console parameters
-    with tcod.console_init_root(
-        w=screen_width,
-        h=screen_height,
+    with tcod.context.new_terminal(
+        screen_width,
+        screen_height,
+        tileset=tileset,
         title="The Worst Roguelike",
-        order="F",
         vsync=True
-    ) as root_console:
+    ) as context:
+        root_console = tcod.Console(screen_width, screen_height, order="F")
         # main loop
         while True:
-            #draw '@'
-            root_console.print(x=player_x, y=player_y, string="@")
+            engine.render(console=root_console, context=context)
 
-            # print to console
-            tcod.console_flush()
+            events = tcod.event.wait()
 
-            # clear previous console
-            root_console.clear()
-
-            # wait for input
-            for event in tcod.event.wait():
-                if event.type == "QUIT":
-                    raise SystemExit()
-
-                if event.type == "KEYDOWN":
-                    action: [Action, None] = handle_keys(event.sym)
-
-                    if action is None:
-                        continue
-
-                    action_type: ActionType = action.action_type
-
-                    if action_type == ActionType.MOVEMENT:
-                        dx = action.kwargs.get("dx", 0)
-                        dy = action.kwargs.get("dy", 0)
-
-                        player_x += dx
-                        player_y += dy
-                    elif action_type == ActionType.ESCAPE:
-                        raise SystemExit()
+            engine.handle_events(events)
 
 
 if __name__ == '__main__':
